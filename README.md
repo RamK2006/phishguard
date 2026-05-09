@@ -2,7 +2,7 @@
 
 **AI-Powered Phishing Detection & Real-Time Browser Protection**
 
-> IIT Guwahati Coding Club — Even Semester 2026
+
 
 ## Overview
 

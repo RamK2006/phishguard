@@ -1,0 +1,16 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv/
+.pytest_cache/
+htmlcov/
+.coverage
+.tox/
+.mypy_cache/
+alembic/versions/*.pyc

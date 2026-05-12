@@ -18,43 +18,32 @@ class Settings(BaseSettings):
     log_level: str = "info"
     debug: bool = False
 
-    # ─── Database ───
-    database_url: str = Field(
-        default="postgresql+asyncpg://phishguard:phishguard_secret@localhost:5432/phishguard"
-    )
-    database_url_sync: str = Field(
-        default="postgresql://phishguard:phishguard_secret@localhost:5432/phishguard"
-    )
-
-    # ─── Redis ───
-    redis_url: str = "redis://localhost:6379/0"
-
-    # ─── Qdrant ───
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
+    # ─── Upstash Redis ───
+    upstash_redis_url: str = ""
+    upstash_redis_token: str = ""
 
     # ─── Clerk Auth ───
-    clerk_secret_key: str = "REPLACE_WITH_YOUR_KEY"
+    clerk_secret_key: str = ""
     clerk_jwks_url: str = "https://your-clerk-instance.clerk.accounts.dev/.well-known/jwks.json"
 
-    # ─── Groq LLM ───
-    groq_api_key: str = "REPLACE_WITH_YOUR_KEY"
-    groq_model: str = "llama-3.1-70b-versatile"
+    # ─── Google Gemini LLM ───
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
 
     # ─── Threat Intelligence ───
-    virustotal_api_key: str = "REPLACE_WITH_YOUR_KEY"
-    abuseipdb_api_key: str = "REPLACE_WITH_YOUR_KEY"
+    virustotal_api_key: str = ""
+    abuseipdb_api_key: str = ""
     urlhaus_api_url: str = "https://urlhaus-api.abuse.ch/v1"
 
     # ─── Extension ───
-    extension_api_key: str = "REPLACE_WITH_YOUR_KEY"
+    extension_api_key: str = ""
 
     # ─── Rate Limiting ───
     rate_limit_extension: int = 100
     rate_limit_analyst: int = 1000
 
     # ─── CORS ───
-    cors_origins: str = "http://localhost:3000,http://localhost:3001,chrome-extension://*"
+    cors_origins: str = "http://localhost:3000,http://localhost:3001,chrome-extension://*,https://*.vercel.app"
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -64,6 +53,7 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
+        "extra": "ignore",
     }
 
 

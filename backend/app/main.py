@@ -1,6 +1,6 @@
 """PhishGuard — FastAPI Application Factory.
 
-Central app with lifespan, CORS, rate limiter, and OpenTelemetry.
+Central app with lifespan, CORS, and logging.
 """
 
 from contextlib import asynccontextmanager
@@ -24,25 +24,8 @@ async def lifespan(app: FastAPI):
     # ─── Startup ───
     logger.info("phishguard_starting", host=settings.backend_host, port=settings.backend_port)
 
-    # Load ML model
+    # Load ML model (optional — falls back to heuristic)
     load_model()
-
-    # Initialize Qdrant collections
-    try:
-        from app.services.visual_similarity import init_brand_collection
-        await init_brand_collection()
-    except Exception as e:
-        logger.warning("qdrant_init_skipped", error=str(e))
-
-    # Create database tables
-    try:
-        from app.db.models import Base
-        from app.db.session import engine
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("database_tables_created")
-    except Exception as e:
-        logger.error("database_init_failed", error=str(e))
 
     logger.info("phishguard_started")
     yield
@@ -83,21 +66,6 @@ async def log_requests(request: Request, call_next):
         status_code=response.status_code,
         latency_ms=latency,
     )
-
-    # Update Prometheus metrics
-    try:
-        from app.api.v1.health import HTTP_REQUESTS, HTTP_DURATION
-        HTTP_REQUESTS.labels(
-            method=request.method,
-            endpoint=request.url.path,
-            status_code=str(response.status_code),
-        ).inc()
-        HTTP_DURATION.labels(
-            method=request.method,
-            endpoint=request.url.path,
-        ).observe(latency / 1000.0)
-    except Exception:
-        pass
 
     return response
 

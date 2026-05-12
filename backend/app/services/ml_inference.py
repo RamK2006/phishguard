@@ -1,10 +1,10 @@
 """PhishGuard — ML Inference Service.
 
-Two-tier inference: LightGBM (fast) + DistilBERT fallback.
+Heuristic-based URL risk scoring for serverless deployment.
+LightGBM model loaded if available, otherwise pure heuristic.
 """
 
 import os
-import joblib
 import numpy as np
 from typing import Dict, Optional, Tuple
 import structlog
@@ -22,17 +22,18 @@ MODEL_PATH = os.path.join(
 
 
 def load_model():
-    """Load LightGBM model from disk at startup."""
+    """Load LightGBM model from disk at startup (optional)."""
     global _lgbm_model, _model_loaded
     if os.path.exists(MODEL_PATH):
         try:
+            import joblib
             _lgbm_model = joblib.load(MODEL_PATH)
             _model_loaded = True
             logger.info("ml_model_loaded", model_path=MODEL_PATH)
         except Exception as e:
-            logger.error("ml_model_load_failed", error=str(e))
+            logger.warning("ml_model_load_skipped", error=str(e))
     else:
-        logger.warning("ml_model_not_found", model_path=MODEL_PATH)
+        logger.info("ml_model_not_found_using_heuristics", model_path=MODEL_PATH)
 
 
 def is_model_loaded() -> bool:
@@ -51,33 +52,10 @@ def predict_url_risk(url: str) -> Tuple[float, Dict[str, float], str]:
         X = np.array([feature_vector])
         proba = _lgbm_model.predict_proba(X)[0]
         ml_score = float(proba[1]) if len(proba) > 1 else float(proba[0])
-
-        if ml_score < 0.3 or ml_score > 0.75:
-            return ml_score, features, "lightgbm"
-
-        # Ambiguous range — try Tier 2
-        tier2 = _distilbert_inference(url)
-        if tier2 is not None:
-            return 0.7 * ml_score + 0.3 * tier2, features, "lightgbm+distilbert"
         return ml_score, features, "lightgbm"
     except Exception as e:
         logger.error("ml_inference_failed", error=str(e))
         return _heuristic_score(features), features, "heuristic"
-
-
-def _distilbert_inference(url: str) -> Optional[float]:
-    """Tier 2 DistilBERT classification for ambiguous scores."""
-    try:
-        from transformers import pipeline
-        clf = pipeline("text-classification", model="distilbert-base-uncased", device=-1)
-        result = clf(url[:512], truncation=True)
-        if result:
-            score = result[0].get("score", 0.5)
-            label = result[0].get("label", "")
-            return 1.0 - score if "NEGATIVE" in label.upper() or "LABEL_0" in label.upper() else score
-    except Exception as e:
-        logger.warning("distilbert_unavailable", error=str(e))
-    return None
 
 
 def _heuristic_score(features: Dict[str, float]) -> float:

@@ -6,12 +6,10 @@ POST /feedback/submit — analyst/user false-positive/negative reports.
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.db.models import Feedback
+from app.db.session import store_feedback
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
@@ -23,24 +21,20 @@ class FeedbackRequest(BaseModel):
 
 
 @router.post("/submit")
-async def submit_feedback(
-    req: FeedbackRequest,
-    db: AsyncSession = Depends(get_db),
-):
+async def submit_feedback(req: FeedbackRequest):
     """Submit feedback on a scan result."""
-    feedback = Feedback(
-        id=uuid.uuid4(),
-        scan_event_id=uuid.UUID(req.scan_event_id),
-        feedback_type=req.feedback_type,
-        comment=req.comment,
-        created_at=datetime.utcnow(),
-    )
+    feedback_id = str(uuid.uuid4())
 
-    db.add(feedback)
-    await db.flush()
+    await store_feedback({
+        "feedback_id": feedback_id,
+        "scan_event_id": req.scan_event_id,
+        "feedback_type": req.feedback_type,
+        "comment": req.comment,
+        "created_at": datetime.utcnow().isoformat(),
+    })
 
     return {
         "status": "submitted",
-        "feedback_id": str(feedback.id),
+        "feedback_id": feedback_id,
         "message": "Thank you for your feedback. It will be used to improve our detection.",
     }

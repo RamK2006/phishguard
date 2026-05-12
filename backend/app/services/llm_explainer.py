@@ -1,6 +1,6 @@
 """PhishGuard — LLM Explainer Service.
 
-Groq API (Llama 3.1 70B) for human-readable risk explanations.
+Google Gemini API for human-readable risk explanations.
 Returns structured JSON with risk_factors, recommended_action, confidence.
 """
 
@@ -19,14 +19,18 @@ async def generate_explanation(
     features: Dict[str, float],
     cti_results: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Generate LLM-powered risk explanation using Groq."""
+    """Generate LLM-powered risk explanation using Google Gemini."""
     if risk_score < 0.4:
         return _safe_explanation(url, risk_score)
 
     try:
-        from groq import AsyncGroq
+        import google.generativeai as genai
 
-        client = AsyncGroq(api_key=settings.groq_api_key)
+        if not settings.gemini_api_key:
+            return _fallback_explanation(url, risk_score, features)
+
+        genai.configure(api_key=settings.gemini_api_key)
+        model = genai.GenerativeModel(settings.gemini_model)
 
         # Build context for the prompt
         suspicious_features = {
@@ -55,7 +59,7 @@ ML Risk Score: {risk_score:.3f}
 Suspicious Features: {json.dumps(suspicious_features)}
 Threat Intelligence: {cti_summary}
 
-Respond in JSON format with exactly these fields:
+Respond ONLY with valid JSON (no markdown, no code fences) with exactly these fields:
 {{
   "risk_factors": ["list of 3-5 specific risk factors found"],
   "recommended_action": "clear action recommendation for the user",
@@ -63,21 +67,16 @@ Respond in JSON format with exactly these fields:
   "summary": "2-3 sentence summary of the threat assessment"
 }}"""
 
-        response = await client.chat.completions.create(
-            model=settings.groq_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a cybersecurity analyst. Analyze URLs for phishing risk. Always respond with valid JSON.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-            max_tokens=500,
-            response_format={"type": "json_object"},
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=500,
+                response_mime_type="application/json",
+            ),
         )
 
-        content = response.choices[0].message.content
+        content = response.text
         explanation = json.loads(content)
 
         return {
